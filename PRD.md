@@ -200,6 +200,7 @@ viral-video-analyzer/
 - pnpm >= 10.x
 - FFmpeg >= 8.0 (`brew install ffmpeg`)
 - Chrome 浏览器 (Playwright 自带 headless Chromium, 不依赖系统 Chrome)
+- yt-dlp EJS challenge solver（YouTube 下载需要 Node.js >= 20；下载器启用 `ejs:github` 远程组件）
 
 ### 5.2 后端 .env 配置
 ```env
@@ -212,6 +213,7 @@ DOUYIN_COOKIE_FILE=cookies.txt
 DELETE_INTERMEDIATE_MEDIA_AFTER_ANALYSIS=false
 YTDLP_COOKIE_FILE=
 YTDLP_BIN=yt-dlp
+YTDLP_PROXY=
 ```
 
 设置 `DELETE_INTERMEDIATE_MEDIA_AFTER_ANALYSIS=true` 后，完整流程结束会清理抽帧、音频和残留视频，只保留 JSON 和 Excel 结果文件。

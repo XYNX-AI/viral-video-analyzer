@@ -1,6 +1,6 @@
 # 爆款短视频拉片复刻系统
 
-AI 驱动的短视频拉片分析工具 —— 输入抖音链接，自动完成秒级拆解、逐字稿提取、爆款密码分析、复刻提示词生成。
+AI 驱动的短视频拉片分析工具 —— 输入支持平台的视频链接，自动完成秒级拆解、逐字稿提取、爆款密码分析、复刻提示词生成。
 
 ## 功能展示
 
@@ -34,9 +34,9 @@ SSE 实时推送，六个阶段逐步完成：下载视频 → 提取关键帧 �
 ### 环境要求
 
 - macOS / Linux
-- Node.js >= 20
+- Node.js >= 20（YouTube yt-dlp challenge solver 需要）
 - Python >= 3.10
-- FFmpeg (`brew install ffmpeg`)
+- FFmpeg（macOS: `brew install ffmpeg`；Ubuntu/Debian: `sudo apt-get install ffmpeg`）
 - pnpm (`npm install -g pnpm`)
 
 ### 1. 克隆项目
@@ -82,9 +82,10 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pip install faster-whisper playwright httpx
 playwright install chromium
 ```
+
+`requirements.txt` 已包含 FastAPI、Playwright、faster-whisper、yt-dlp、OpenAI 客户端和 Excel 导出依赖。系统仍需单独安装 FFmpeg。YouTube 下载使用 yt-dlp 的 EJS challenge solver，项目会通过 Node.js 和 `--remote-components ejs:github` 自动启用；服务器需要能访问 GitHub，或提前配置 yt-dlp 的 EJS 组件缓存。
 
 ### 4. 安装前端
 
@@ -104,7 +105,7 @@ cd backend && source .venv/bin/activate && uvicorn main:app --port 8000
 cd frontend && pnpm dev
 ```
 
-打开 http://localhost:3000 ，粘贴抖音视频链接即可使用。
+打开 http://localhost:3000，粘贴抖音、TikTok、Instagram、YouTube、X、Pinterest 等支持平台的视频链接即可使用。
 
 ## 工作原理
 

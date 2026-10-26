@@ -121,9 +121,12 @@ async def _download_ytdlp_video(url: str, output_dir: str) -> VideoMeta:
     command = [
         *( [binary] if binary else [sys.executable, "-m", "yt_dlp"] ),
         "--no-playlist",
+        "--remote-components", "ejs:github",
+        "--js-runtimes", "node",
         "--write-info-json",
         "--no-write-thumbnail",
-        "--format", "bv*+ba/b",
+        # Keep analysis downloads bounded and prefer broadly supported H.264.
+        "--format", "bv*[height<=1080][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=1080]+ba/b[height<=1080]",
         "--merge-output-format", "mp4",
         "--output", os.path.join(output_dir, "video.%(ext)s"),
         "--print-json",
