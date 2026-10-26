@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # Optional per-platform yt-dlp cookie files. Format: platform=/path/file,platform2=/path/file2
     YTDLP_COOKIE_FILES: str = ""
     YTDLP_BIN: str = "yt-dlp"
+    YTDLP_PROXY: str = ""
     # faster-whisper model size: tiny/base/small/medium/large-v3.
     WHISPER_MODEL: str = "small"
     # Delete the downloaded video right after frame/audio extraction, and the

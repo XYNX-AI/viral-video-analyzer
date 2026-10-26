@@ -64,6 +64,7 @@ DELETE_INTERMEDIATE_MEDIA_AFTER_ANALYSIS=false
 YTDLP_COOKIE_FILE=/path/to/cookies.txt
 YTDLP_COOKIE_FILES=
 YTDLP_BIN=yt-dlp
+YTDLP_PROXY=
 ```
 
 将 `DELETE_INTERMEDIATE_MEDIA_AFTER_ANALYSIS` 设置为 `true` 后，分析结束会删除本地抽帧、音频和残留视频，只保留 `result.json` 与 `result.xlsx`。结果页中的视频和帧预览需要保留这些文件时，请保持为 `false`。
@@ -72,6 +73,7 @@ YTDLP_BIN=yt-dlp
 
 视频下载支持抖音、TikTok、Instagram Reels、YouTube Shorts、X、Pinterest 等平台。抖音使用 Playwright + `DOUYIN_COOKIE_FILE`，其他平台使用 `yt-dlp`；需要登录态的平台可将多个平台的 Cookie 合并到同一个 Netscape 格式文件，并配置到 `YTDLP_COOKIE_FILE`。
 多个海外平台可以共用一个包含多个域名 Cookie 的 Netscape 文件；也可以使用 `YTDLP_COOKIE_FILES=tiktok=/path/tiktok.txt,instagram=/path/instagram.txt` 按平台指定文件，平台专用配置优先于 `YTDLP_COOKIE_FILE`。
+如果服务器访问海外平台需要代理，可配置 `YTDLP_PROXY=http://127.0.0.1:7890`。
 
 ### 3. 安装后端
 

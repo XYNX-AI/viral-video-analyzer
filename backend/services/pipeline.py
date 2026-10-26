@@ -35,6 +35,7 @@ def _cleanup_media(path: str, label: str) -> None:
         os.remove(path)
         print(f"[pipeline] cleaned up {label}: {path} (freed {size_mb:.1f} MB)")
     except Exception as e:
+        print(f"[pipeline] task={task_id} url={url} failed: {e}", flush=True)
         print(f"[pipeline] cleanup failed for {label} {path}: {e}")
 
 

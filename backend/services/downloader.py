@@ -133,6 +133,9 @@ async def _download_ytdlp_video(url: str, output_dir: str) -> VideoMeta:
         if not os.path.exists(cookie_file):
             raise RuntimeError(f"YTDLP_COOKIE_FILE 不存在: {cookie_file}")
         command.extend(["--cookies", cookie_file])
+    proxy = (settings.YTDLP_PROXY or "").strip()
+    if proxy:
+        command.extend(["--proxy", proxy])
     command.append(url)
 
     process = await asyncio.create_subprocess_exec(
