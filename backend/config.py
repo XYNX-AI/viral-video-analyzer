@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     OPENAI_VISION_MODEL: str = "gpt-4o-mini"
     DATA_DIR: str = "data"
     DOUYIN_COOKIE_FILE: str = ""
+    # Optional Netscape cookie file used by yt-dlp for overseas platforms.
+    YTDLP_COOKIE_FILE: str = ""
+    YTDLP_BIN: str = "yt-dlp"
     # faster-whisper model size: tiny/base/small/medium/large-v3.
     WHISPER_MODEL: str = "small"
     # Delete the downloaded video right after frame/audio extraction, and the

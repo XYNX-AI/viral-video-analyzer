@@ -210,9 +210,13 @@ OPENAI_VISION_MODEL=gpt-4o-mini
 DATA_DIR=data
 DOUYIN_COOKIE_FILE=cookies.txt
 DELETE_INTERMEDIATE_MEDIA_AFTER_ANALYSIS=false
+YTDLP_COOKIE_FILE=
+YTDLP_BIN=yt-dlp
 ```
 
 设置 `DELETE_INTERMEDIATE_MEDIA_AFTER_ANALYSIS=true` 后，完整流程结束会清理抽帧、音频和残留视频，只保留 JSON 和 Excel 结果文件。
+
+下载器支持抖音、TikTok、Instagram Reels、YouTube Shorts、X、Pinterest 等平台。抖音继续使用 Playwright 专用路径，其他平台通过 yt-dlp 统一下载并映射为项目现有的 `VideoMeta`。
 
 ### 5.3 前端 .env.local 配置
 ```env

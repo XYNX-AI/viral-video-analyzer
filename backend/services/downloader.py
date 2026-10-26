@@ -2,6 +2,8 @@ import asyncio
 import json
 import os
 import re
+import shutil
+import sys
 
 import httpx
 from playwright.async_api import async_playwright
@@ -58,7 +60,24 @@ def _load_cookie_file() -> list[dict]:
 
 
 async def download_video(url: str, output_dir: str) -> VideoMeta:
-    """Download Douyin video: fetch detail via Playwright → extract URL → download."""
+    """Download a supported video URL and normalize metadata.
+
+    Douyin keeps its authenticated Playwright path because it reliably handles
+    the site's detail API. Other platforms use yt-dlp, which supports TikTok,
+    Instagram Reels, YouTube Shorts, X, Pinterest and many more sites.
+    """
+    if _is_douyin_url(url):
+        return await _download_douyin_video(url, output_dir)
+    return await _download_ytdlp_video(url, output_dir)
+
+
+def _is_douyin_url(url: str) -> bool:
+    lowered = url.lower()
+    return "douyin.com" in lowered or "iesdouyin.com" in lowered
+
+
+async def _download_douyin_video(url: str, output_dir: str) -> VideoMeta:
+    """Download Douyin video with the existing Playwright detail flow."""
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "video.mp4")
 
@@ -90,6 +109,92 @@ async def download_video(url: str, output_dir: str) -> VideoMeta:
         raise RuntimeError("视频下载失败或文件过小")
 
     return meta
+
+
+async def _download_ytdlp_video(url: str, output_dir: str) -> VideoMeta:
+    """Download non-Douyin platforms through yt-dlp and parse info JSON."""
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "video.mp4")
+    info_path = os.path.join(output_dir, "ytdlp_info.json")
+
+    binary = shutil.which(settings.YTDLP_BIN)
+    command = [
+        *( [binary] if binary else [sys.executable, "-m", "yt_dlp"] ),
+        "--no-playlist",
+        "--write-info-json",
+        "--no-write-thumbnail",
+        "--format", "bv*+ba/b",
+        "--merge-output-format", "mp4",
+        "--output", os.path.join(output_dir, "video.%(ext)s"),
+        "--print-json",
+    ]
+    cookie_file = (settings.YTDLP_COOKIE_FILE or "").strip()
+    if cookie_file:
+        if not os.path.exists(cookie_file):
+            raise RuntimeError(f"YTDLP_COOKIE_FILE 不存在: {cookie_file}")
+        command.extend(["--cookies", cookie_file])
+    command.append(url)
+
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await process.communicate()
+    if process.returncode != 0:
+        detail = stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"跨平台视频下载失败: {detail[-800:]}")
+
+    info = _parse_ytdlp_json(stdout.decode("utf-8", errors="replace"), output_dir)
+    if not os.path.exists(output_path):
+        candidates = [
+            path for path in (os.path.join(output_dir, name) for name in os.listdir(output_dir))
+            if os.path.isfile(path) and os.path.splitext(path)[1].lower() in {".mp4", ".mkv", ".webm", ".mov"}
+        ]
+        if candidates:
+            os.replace(candidates[0], output_path)
+    if not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
+        raise RuntimeError("跨平台视频下载完成但未找到有效视频文件")
+
+    with open(info_path, "w", encoding="utf-8") as f:
+        json.dump(info, f, ensure_ascii=False)
+    return _parse_ytdlp_meta(info)
+
+
+def _parse_ytdlp_json(stdout: str, output_dir: str) -> dict:
+    """Parse yt-dlp's final JSON line, with info-file fallback."""
+    for line in reversed(stdout.splitlines()):
+        try:
+            value = json.loads(line)
+            if isinstance(value, dict) and (value.get("id") or value.get("title")):
+                return value
+        except json.JSONDecodeError:
+            continue
+
+    info_files = sorted(
+        os.path.join(output_dir, name)
+        for name in os.listdir(output_dir)
+        if name.endswith(".info.json")
+    )
+    if info_files:
+        with open(info_files[-1], "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def _parse_ytdlp_meta(info: dict) -> VideoMeta:
+    """Map common yt-dlp metadata fields into the existing VideoMeta schema."""
+    duration = info.get("duration") or 0
+    return VideoMeta(
+        title=info.get("title") or info.get("description") or "",
+        author=info.get("uploader") or info.get("channel") or "",
+        author_id=info.get("uploader_id") or info.get("channel_id") or "",
+        likes=info.get("like_count"),
+        comments=info.get("comment_count"),
+        shares=info.get("repost_count") or info.get("share_count"),
+        duration=float(duration),
+        thumbnail_url=info.get("thumbnail"),
+    )
 
 
 async def _fetch_detail_playwright(url: str) -> dict | None:

@@ -61,11 +61,15 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_VISION_MODEL=gpt-4o-mini
 DELETE_INTERMEDIATE_MEDIA_AFTER_ANALYSIS=false
+YTDLP_COOKIE_FILE=
+YTDLP_BIN=yt-dlp
 ```
 
 将 `DELETE_INTERMEDIATE_MEDIA_AFTER_ANALYSIS` 设置为 `true` 后，分析结束会删除本地抽帧、音频和残留视频，只保留 `result.json` 与 `result.xlsx`。结果页中的视频和帧预览需要保留这些文件时，请保持为 `false`。
 
 批量分析可调用 `POST /api/analyze/batch`，请求体为 `{"urls": ["链接1", "链接2"]}`，也可以传 `urls_file` 指向后端服务器上的每行一个链接的文本文件。批次完成后可通过 `GET /api/results/{task_id}/excel` 下载汇总 Excel。
+
+视频下载支持抖音、TikTok、Instagram Reels、YouTube Shorts、X、Pinterest 等平台。抖音使用 Playwright + `DOUYIN_COOKIE_FILE`，其他平台使用 `yt-dlp`；需要登录态的平台可配置 Netscape 格式 Cookie 文件到 `YTDLP_COOKIE_FILE`。
 
 ### 3. 安装后端
 
