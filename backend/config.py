@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     DOUYIN_COOKIE_FILE: str = ""
     # Optional Netscape cookie file used by yt-dlp for overseas platforms.
     YTDLP_COOKIE_FILE: str = ""
+    # Optional per-platform yt-dlp cookie files. Format: platform=/path/file,platform2=/path/file2
+    YTDLP_COOKIE_FILES: str = ""
     YTDLP_BIN: str = "yt-dlp"
     # faster-whisper model size: tiny/base/small/medium/large-v3.
     WHISPER_MODEL: str = "small"

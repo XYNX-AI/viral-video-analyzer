@@ -19,7 +19,7 @@ export default function BatchUrlInput({ onSubmit, loading }: BatchUrlInputProps)
       <textarea
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        placeholder="每行粘贴一个视频链接，最多 50 条..."
+        placeholder="每行粘贴一个视频链接，支持抖音、TikTok、Instagram、YouTube、X 等平台，最多 50 条..."
         rows={6}
         className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
         disabled={loading}

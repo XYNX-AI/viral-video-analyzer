@@ -61,7 +61,8 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_VISION_MODEL=gpt-4o-mini
 DELETE_INTERMEDIATE_MEDIA_AFTER_ANALYSIS=false
-YTDLP_COOKIE_FILE=
+YTDLP_COOKIE_FILE=/path/to/cookies.txt
+YTDLP_COOKIE_FILES=
 YTDLP_BIN=yt-dlp
 ```
 
@@ -69,7 +70,8 @@ YTDLP_BIN=yt-dlp
 
 批量分析可调用 `POST /api/analyze/batch`，请求体为 `{"urls": ["链接1", "链接2"]}`，也可以传 `urls_file` 指向后端服务器上的每行一个链接的文本文件。批次完成后可通过 `GET /api/results/{task_id}/excel` 下载汇总 Excel。
 
-视频下载支持抖音、TikTok、Instagram Reels、YouTube Shorts、X、Pinterest 等平台。抖音使用 Playwright + `DOUYIN_COOKIE_FILE`，其他平台使用 `yt-dlp`；需要登录态的平台可配置 Netscape 格式 Cookie 文件到 `YTDLP_COOKIE_FILE`。
+视频下载支持抖音、TikTok、Instagram Reels、YouTube Shorts、X、Pinterest 等平台。抖音使用 Playwright + `DOUYIN_COOKIE_FILE`，其他平台使用 `yt-dlp`；需要登录态的平台可将多个平台的 Cookie 合并到同一个 Netscape 格式文件，并配置到 `YTDLP_COOKIE_FILE`。
+多个海外平台可以共用一个包含多个域名 Cookie 的 Netscape 文件；也可以使用 `YTDLP_COOKIE_FILES=tiktok=/path/tiktok.txt,instagram=/path/instagram.txt` 按平台指定文件，平台专用配置优先于 `YTDLP_COOKIE_FILE`。
 
 ### 3. 安装后端
 

@@ -128,7 +128,7 @@ async def _download_ytdlp_video(url: str, output_dir: str) -> VideoMeta:
         "--output", os.path.join(output_dir, "video.%(ext)s"),
         "--print-json",
     ]
-    cookie_file = (settings.YTDLP_COOKIE_FILE or "").strip()
+    cookie_file = _get_ytdlp_cookie_file(url)
     if cookie_file:
         if not os.path.exists(cookie_file):
             raise RuntimeError(f"YTDLP_COOKIE_FILE 不存在: {cookie_file}")
@@ -159,6 +159,35 @@ async def _download_ytdlp_video(url: str, output_dir: str) -> VideoMeta:
     with open(info_path, "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False)
     return _parse_ytdlp_meta(info)
+
+
+def _get_ytdlp_cookie_file(url: str) -> str:
+    """Resolve a yt-dlp cookie file, preferring a platform-specific override."""
+    platform = _detect_ytdlp_platform(url)
+    mappings = {}
+    for item in (settings.YTDLP_COOKIE_FILES or "").split(","):
+        item = item.strip()
+        if not item or "=" not in item:
+            continue
+        name, path = item.split("=", 1)
+        if name.strip() and path.strip():
+            mappings[name.strip().lower()] = path.strip()
+    return mappings.get(platform) or (settings.YTDLP_COOKIE_FILE or "").strip()
+
+
+def _detect_ytdlp_platform(url: str) -> str:
+    host = re.sub(r"^www\.", "", re.findall(r"https?://([^/]+)", url.lower())[0]) if re.findall(r"https?://([^/]+)", url.lower()) else ""
+    if "tiktok.com" in host:
+        return "tiktok"
+    if "instagram.com" in host:
+        return "instagram"
+    if "youtube.com" in host or host == "youtu.be":
+        return "youtube"
+    if "twitter.com" in host or "x.com" in host:
+        return "x"
+    if "pinterest." in host:
+        return "pinterest"
+    return "default"
 
 
 def _parse_ytdlp_json(stdout: str, output_dir: str) -> dict:

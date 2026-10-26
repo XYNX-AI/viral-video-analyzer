@@ -18,6 +18,8 @@ frontend/.env.local
 # Runtime data
 backend/data/
 backend/cookies.txt
+backend/douyin_cookies.txt
+backend/tiktok_cookies.txt
 logs/
 
 # OS
