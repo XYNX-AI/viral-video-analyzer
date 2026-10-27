@@ -1,0 +1,57 @@
+services:
+  backend:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      extra_hosts:
+        - "host.docker.internal:host-gateway"
+      args:
+        PLAYWRIGHT_DOWNLOAD_PROXY: ${PLAYWRIGHT_PROXY:-}
+    env_file:
+      - ./backend/.env
+    environment:
+      DATA_DIR: /app/data
+      DOUYIN_COOKIE_FILE: /app/secrets/douyin_cookies.txt
+      YTDLP_COOKIE_FILE: /app/secrets/cookies.txt
+      YTDLP_PROXY: ${YTDLP_PROXY:-http://host.docker.internal:7891}
+      PLAYWRIGHT_PROXY: ${PLAYWRIGHT_PROXY:-http://host.docker.internal:7891}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      ALL_PROXY: ${ALL_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1}
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/cookies.txt:/app/secrets/cookies.txt:ro
+      - ./backend/douyin_cookies.txt:/app/secrets/douyin_cookies.txt:ro
+      - whisper-cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  frontend:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      extra_hosts:
+        - "host.docker.internal:host-gateway"
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+        BACKEND_URL: http://backend:8000
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  whisper-cache:

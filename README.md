@@ -107,6 +107,66 @@ cd frontend && pnpm dev
 
 打开 http://localhost:3000，粘贴抖音、TikTok、Instagram、YouTube、X、Pinterest 等支持平台的视频链接即可使用。
 
+### Docker 部署
+
+项目提供了前后端分离的 Docker Compose 部署方式。后端镜像包含 Python 依赖、FFmpeg、Node.js、Playwright Chromium 和 yt-dlp；前端使用 Next.js standalone 镜像。Cookie、API Key、分析结果和 Whisper 模型缓存都在运行时挂载，不会写入镜像。
+
+先准备配置和 Cookie 文件：
+
+```bash
+cp backend/.env.example backend/.env
+# 编辑 backend/.env，填写 OPENAI_API_KEY
+# 将海外平台 Cookie 放入 backend/cookies.txt
+# 将抖音 Cookie 放入 backend/douyin_cookies.txt
+touch backend/cookies.txt backend/douyin_cookies.txt
+```
+
+如果服务器访问海外平台需要宿主机代理，在项目根目录创建 Compose 的变量文件：
+
+```env
+YTDLP_PROXY=http://host.docker.internal:7891
+PLAYWRIGHT_PROXY=http://host.docker.internal:7891
+HTTP_PROXY=http://host.docker.internal:7891
+HTTPS_PROXY=http://host.docker.internal:7891
+```
+
+也可以直接复制项目提供的模板：`cp .env.docker.example .env`，再按实际代理地址修改。Python 和 Debian 依赖从清华 PyPI、腾讯 Debian 镜像直连安装；`PLAYWRIGHT_PROXY` 也会用于下载 Chromium 浏览器包。前端使用相对 `/api` 地址，由 Next.js 转发到后端容器，因此不需要设置公网 API 地址。
+
+容器内的 `127.0.0.1` 指向容器自身，不能直接访问宿主机代理。Linux 主机需要让 Docker daemon 使用本机代理拉取基础镜像，并提供仅绑定 Docker 网桥的 `host.docker.internal:7891` 转发入口给运行容器访问海外平台。
+
+构建并启动：
+
+```bash
+docker compose build
+docker compose up -d
+docker compose ps
+```
+
+访问 `http://localhost:3000`。停止服务：
+
+```bash
+docker compose down
+```
+
+首次构建需要下载 Python 包、Playwright Chromium 和镜像基础层；首次运行 faster-whisper 还会下载模型并保存到 Compose 的 `whisper-cache` 卷。YouTube 下载需要容器能够访问 GitHub，以便 yt-dlp 获取 EJS challenge solver。
+
+如果 `docker compose build` 在拉取 `node:20-bookworm-slim` 时超时，需要给 Docker daemon 配置代理。以 systemd Linux 主机为例：
+
+```bash
+sudo mkdir -p /etc/systemd/system/docker.service.d
+sudo tee /etc/systemd/system/docker.service.d/proxy.conf >/dev/null <<'EOF'
+[Service]
+Environment="HTTP_PROXY=http://127.0.0.1:7890"
+Environment="HTTPS_PROXY=http://127.0.0.1:7890"
+Environment="NO_PROXY=localhost,127.0.0.1,.internal"
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+docker compose build
+```
+
+如果代理只监听宿主机回环地址，Docker daemon 可能无法访问它；此时让代理监听 Docker 网桥可访问的地址，或使用可访问的镜像仓库。容器运行时仍使用 `host.docker.internal` 访问宿主机代理。
+
 ## 工作原理
 
 ```

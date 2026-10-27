@@ -11,7 +11,47 @@ from playwright.async_api import async_playwright
 from config import settings
 from models.schemas import VideoMeta
 
+
 _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+_xvfb_process = None
+_xvfb_display = None
+_xvfb_lock = asyncio.Lock()
+
+
+async def _ensure_virtual_display() -> bool:
+    """Start Xvfb once so Douyin sees a headed Chromium browser in Docker."""
+    global _xvfb_process, _xvfb_display
+    if os.environ.get("DISPLAY"):
+        return True
+    if not shutil.which("Xvfb"):
+        return False
+
+    async with _xvfb_lock:
+        if _xvfb_process and _xvfb_process.returncode is None:
+            os.environ["DISPLAY"] = _xvfb_display
+            return True
+
+        process = await asyncio.create_subprocess_exec(
+            "Xvfb", "-displayfd", "1", "-screen", "0", "1920x1080x24",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        try:
+            display_number = await asyncio.wait_for(process.stdout.readline(), timeout=5)
+        except asyncio.TimeoutError:
+            process.terminate()
+            await process.wait()
+            return False
+
+        if not display_number.strip().isdigit():
+            process.terminate()
+            await process.wait()
+            return False
+
+        _xvfb_process = process
+        _xvfb_display = f":{display_number.decode().strip()}"
+        os.environ["DISPLAY"] = _xvfb_display
+        return True
 
 
 def _load_cookie_file() -> list[dict]:
@@ -244,13 +284,44 @@ async def _fetch_detail_playwright(url: str) -> dict | None:
     if "douyin.com/video/" not in url:
         url = f"https://www.douyin.com/video/{aweme_id}"
 
+    last_failure = None
+    for attempt in range(1, 4):
+        detail, attempt_failure = await _fetch_detail_attempt(url, aweme_id, attempt)
+        if detail:
+            return detail
+        if attempt_failure:
+            last_failure = attempt_failure
+        if attempt < 3:
+            await asyncio.sleep(attempt * 2)
+
+    if last_failure:
+        raise RuntimeError(last_failure)
+    return None
+
+
+async def _fetch_detail_attempt(
+    url: str, aweme_id: str, attempt: int
+) -> tuple[dict | None, str | None]:
     detail_json = None
+    failure_reason = None
+    has_display = await _ensure_virtual_display()
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        # Douyin is reachable directly. Keep overseas yt-dlp proxy settings out
+        # of this browser flow because changing the exit node breaks its session
+        # and device verification.
+        browser = await p.chromium.launch(
+            headless=not has_display,
+            args=["--disable-blink-features=AutomationControlled"] if has_display else [],
+        )
+        user_agent = (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            f"Chrome/{browser.version} Safari/537.36"
+        )
         context = await browser.new_context(
-            user_agent=_UA,
-            viewport={"width": 1280, "height": 720},
+            user_agent=user_agent,
+            viewport={"width": 1920, "height": 1080},
             locale="zh-CN",
         )
         cookies = _load_cookie_file()
@@ -262,7 +333,7 @@ async def _fetch_detail_playwright(url: str) -> dict | None:
         response_future = asyncio.get_event_loop().create_future()
 
         async def handle_response(response):
-            nonlocal detail_json
+            nonlocal detail_json, failure_reason
             if response_future.done():
                 return
             resp_url = response.url
@@ -273,24 +344,45 @@ async def _fetch_detail_playwright(url: str) -> dict | None:
                         detail_json = body
                         if not response_future.done():
                             response_future.set_result(body)
+                    else:
+                        failure_reason = (
+                            "抖音详情接口返回空数据 "
+                            f"(HTTP {response.status}, status_code="
+                            f"{body.get('status_code', 'unknown')})"
+                        )
+                        print(
+                            "[downloader] Douyin detail had no video data "
+                            f"(attempt {attempt}/3, http={response.status}, "
+                            f"status_code={body.get('status_code', 'unknown')})"
+                        )
                 except Exception:
-                    pass
+                    if response.status >= 400:
+                        failure_reason = (
+                            f"抖音详情接口拒绝请求 (HTTP {response.status})，"
+                            "请刷新登录 Cookie 后重试"
+                        )
+                        print(
+                            "[downloader] Douyin detail request rejected "
+                            f"(attempt {attempt}/3, http={response.status})"
+                        )
 
         page.on("response", handle_response)
 
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            # Wait for the API response (max 20s)
-            await asyncio.wait_for(asyncio.shield(response_future), timeout=20)
+            await page.goto(url, wait_until="commit", timeout=30000)
+            await asyncio.wait_for(asyncio.shield(response_future), timeout=18)
         except asyncio.TimeoutError:
             # Try to extract from page SSR data as fallback
             detail_json = await _extract_from_ssr(page, aweme_id)
+            if not detail_json:
+                failure_reason = "等待抖音详情接口超时，请稍后重试"
+                print(f"[downloader] Douyin detail timed out (attempt {attempt}/3)")
         except Exception:
             pass
         finally:
             await browser.close()
 
-    return detail_json
+    return detail_json, failure_reason
 
 
 async def _extract_from_ssr(page, aweme_id: str) -> dict | None:
@@ -390,6 +482,7 @@ def _get_best_video_url(aweme: dict) -> str | None:
 async def _download_file(url: str, output_path: str):
     cmd = [
         "curl", "-L", "-o", output_path,
+        "--noproxy", "*",
         "-H", f"User-Agent: {_UA}",
         "-H", "Referer: https://www.douyin.com/",
         "--max-time", "120", "--retry", "2", "-s",

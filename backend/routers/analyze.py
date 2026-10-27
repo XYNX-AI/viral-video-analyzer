@@ -18,6 +18,24 @@ router = APIRouter()
 tasks: dict[str, dict] = {}
 
 
+class TaskEventLog:
+    """Retain task events so every SSE subscriber can replay progress."""
+
+    def __init__(self) -> None:
+        self.events: list[dict] = []
+        self.condition = asyncio.Condition()
+
+    async def put(self, event: dict) -> None:
+        async with self.condition:
+            self.events.append(event)
+            self.condition.notify_all()
+
+    async def get_after(self, index: int) -> dict:
+        async with self.condition:
+            await self.condition.wait_for(lambda: index < len(self.events))
+            return self.events[index]
+
+
 class AnalyzeRequest(BaseModel):
     url: str
     detail: Optional[dict] = None  # Allow frontend to pass pre-fetched detail JSON
@@ -31,7 +49,7 @@ class BatchAnalyzeRequest(BaseModel):
 @router.post("/api/analyze", response_model=AnalyzeResponse)
 async def start_analysis(req: AnalyzeRequest, background_tasks: BackgroundTasks):
     task_id = str(uuid.uuid4())[:8]
-    event_queue = asyncio.Queue()
+    event_queue = TaskEventLog()
     tasks[task_id] = {
         "status": "queued",
         "events": event_queue,
@@ -65,7 +83,7 @@ async def start_batch_analysis(req: BatchAnalyzeRequest, background_tasks: Backg
         raise HTTPException(400, "单批最多支持 50 个视频链接")
 
     batch_id = f"batch-{uuid.uuid4().hex[:8]}"
-    event_queue = asyncio.Queue()
+    event_queue = TaskEventLog()
     tasks[batch_id] = {
         "status": "queued",
         "events": event_queue,
@@ -81,10 +99,12 @@ async def stream_progress(task_id: str):
         raise HTTPException(404, "Task not found")
 
     async def event_generator():
-        queue = tasks[task_id]["events"]
+        event_log: TaskEventLog = tasks[task_id]["events"]
+        cursor = 0
         while True:
             try:
-                event = await asyncio.wait_for(queue.get(), timeout=300)
+                event = await asyncio.wait_for(event_log.get_after(cursor), timeout=300)
+                cursor += 1
                 yield {
                     "event": event["type"],
                     "data": json.dumps(event["data"], ensure_ascii=False),

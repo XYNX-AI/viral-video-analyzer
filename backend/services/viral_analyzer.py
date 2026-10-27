@@ -2,6 +2,7 @@ import asyncio
 import functools
 import json
 
+import httpx
 from openai import OpenAI
 from pydantic import ValidationError
 
@@ -40,6 +41,7 @@ def _get_client() -> OpenAI:
     return OpenAI(
         base_url=settings.OPENAI_BASE_URL,
         api_key=settings.OPENAI_API_KEY,
+        http_client=httpx.Client(trust_env=False),
     )
 
 

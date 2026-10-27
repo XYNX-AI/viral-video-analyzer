@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     YTDLP_COOKIE_FILES: str = ""
     YTDLP_BIN: str = "yt-dlp"
     YTDLP_PROXY: str = ""
+    PLAYWRIGHT_PROXY: str = ""
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
     # faster-whisper model size: tiny/base/small/medium/large-v3.
     WHISPER_MODEL: str = "small"
     # Delete the downloaded video right after frame/audio extraction, and the

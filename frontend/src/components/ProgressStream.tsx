@@ -32,13 +32,17 @@ export default function ProgressStream({
     }))
   );
   const [progress, setProgress] = useState(0);
-  const [message, setMessage] = useState("准备中...");
+  const [message, setMessage] = useState("正在连接任务进度...");
+  const [connectionStatus, setConnectionStatus] = useState("正在连接");
+  const hasProgressRef = useRef(false);
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     const es = connectSSE(
       taskId,
       (event: SSEEvent) => {
+        hasProgressRef.current = true;
+        setConnectionStatus("进度已连接");
         if (event.type === "progress") {
           const { stage, progress: p, message: msg } = event.data;
           if (p) setProgress(p);
@@ -79,7 +83,16 @@ export default function ProgressStream({
         }
       },
       () => {
-        onError("连接中断，请刷新重试");
+        setConnectionStatus("进度已连接");
+        if (!hasProgressRef.current) {
+          setMessage("任务已提交，正在等待后台进度...");
+        }
+      },
+      () => {
+        setConnectionStatus("连接中断，正在自动重连");
+      },
+      () => {
+        onError("任务进度连接已关闭，请重新提交任务");
       }
     );
     esRef.current = es;
@@ -92,6 +105,10 @@ export default function ProgressStream({
   return (
     <div className="w-full max-w-xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
       <h2 className="text-lg font-semibold text-gray-900 mb-6">分析进行中</h2>
+
+      <p className="mb-4 text-sm text-gray-500" role="status" aria-live="polite">
+        {connectionStatus}
+      </p>
 
       <div className="space-y-3 mb-6">
         {stages.map((stage) => (

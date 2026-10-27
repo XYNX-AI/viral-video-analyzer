@@ -3,6 +3,7 @@ import base64
 import functools
 import json
 
+import httpx
 from openai import OpenAI
 
 from config import settings
@@ -43,6 +44,7 @@ def _get_client() -> OpenAI:
     return OpenAI(
         base_url=settings.OPENAI_BASE_URL,
         api_key=settings.OPENAI_API_KEY,
+        http_client=httpx.Client(trust_env=False),
     )
 
 
